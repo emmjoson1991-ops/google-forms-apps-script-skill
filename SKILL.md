@@ -1,152 +1,208 @@
 ---
 name: google-form-apps-script
 description: >-
-  Generate Google Forms programmatically using Google Apps Script (FormApp) and retrieve
-  submitted responses into structured JSON. Supports V1 execution logs, V2 Web App HTTP JSON APIs,
-  and V2 outbound webhooks — all requiring 100% ZERO Google Cloud Platform (GCP) registration.
-  Enforces strict defaults: no email collection, question 1 is Name (optional), never require responses,
-  explicit context description, and unconstrained final text box.
+  Generate unbiased, asynchronous Google Forms programmatically using Google Apps Script (FormApp)
+  and retrieve submitted responses as structured JSON. Eliminates LLM confirmation bias and
+  conversational bloat via deterministic "If X, Then Y" question routing. Supports V3 Web App
+  HTTP JSON APIs, outbound webhooks, and execution log dumpers with 100% ZERO Google Cloud
+  Platform (GCP) registration.
 metadata:
-  version: v2
+  version: v3.0
 ---
 
-# Google Form Apps Script Skill (`google-form-apps-script`) - Version 2.0
+# Google Form Apps Script Skill (`google-form-apps-script`) - Version 3.0
 
-This skill enables an LLM or developer to design, programmatically construct, manage, and extract data from **Google Forms** using **Google Apps Script** (`FormApp`, `ContentService`, `UrlFetchApp`, `SpreadsheetApp`).
+This skill enables an AI agent or developer to replace verbose, biased back-and-forth interrogation with clean, asynchronous **Google Forms** built via **Google Apps Script** (`FormApp`, `ContentService`, `UrlFetchApp`).
 
 > [!IMPORTANT]
 > **Zero Google Cloud Platform (GCP) Registration Required**
-> Everything in V2 operates entirely inside standard Google Drive and Google Apps Script (`script.google.com`). You do **NOT** need a Google Cloud account, project ID, billing account, or GCP credentials. It works on any free personal `@gmail.com` or Google Workspace account out of the box.
+> Everything in V3 operates 100% inside standard Google Drive and Google Apps Script (`script.google.com`). You do **NOT** need a Google Cloud account, project ID, billing account, OAuth consent screen, or service account keys. It works out of the box on any free `@gmail.com` or Google Workspace account.
 
 ---
 
-## 1. Non-Negotiable Core Rules
+## 1. Non-Negotiable Core Invariants
 
-Whenever generating a Google Form via Google Apps Script:
+Every generated Google Form script MUST obey these seven structural invariants:
 
-1. **Email Collection Off by Default**:
-   Always invoke `form.setCollectEmail(false)` unless explicitly instructed to collect emails.
-2. **First Question is Always "Name"**:
-   Question 1 must always be:
+1. **Email Collection Disabled by Default**:
+   Always invoke `form.setCollectEmail(false)` unless the user explicitly requests email collection.
+2. **Question 1 is Always "Name"**:
+   The very first question added to the form must always be:
    ```javascript
    form.addTextItem()
      .setTitle("Name")
-     .setHelpText("Please enter your name (optional)")
+     .setHelpText("Please enter your name or handle (optional)")
      .setRequired(false);
    ```
 3. **Never Require Any Specific Response**:
-   All questions must remain strictly optional (`.setRequired(false)`). Never block form submission by requiring any specific question, field, or response (including Name).
-4. **Form Must Provide Explicit Context (Why It Exists)**:
-   The form description (`form.setDescription(...)`) MUST clearly explain why the form exists, the background situation, how responses will be used, and the expected time commitment. Never leave it blank or generic.
-5. **Final Question is Always an Open Freeform Text Area**:
-   The very last question of every form must ALWAYS be a long paragraph text item (`form.addParagraphTextItem()`) where the user can write in any format or manner she pleases. Must also be `.setRequired(false)`.
-6. **Dual-Function / Multi-Profile Integrity**:
-   Always provide self-contained, runnable code. The user only ever has to paste once.
-7. **On-Demand or Configured Webhook Only**:
-   Do not attach unsolicited notification spam.
+   Every single question item on the form must explicitly invoke `.setRequired(false)`. Never use `.setRequired(true)` or block submission on any field.
+4. **Explicit Context Description (Why This Form Exists)**:
+   `form.setDescription(...)` must clearly state why the form was generated, what architectural or operational decision it unblocks, how the JSON output will be consumed, and the estimated completion time.
+5. **Final Question is Always an Unconstrained Freeform Text Area**:
+   The last question added to the form must always be an open `form.addParagraphTextItem()` with `.setRequired(false)` so the respondent can override assumptions or write arbitrary notes.
+6. **Self-Contained Paste-Once Execution**:
+   All generated `.gs` files must be 100% self-contained with zero placeholders or missing helper functions.
+7. **State Persistence via `PropertiesService`**:
+   Always store the generated form ID via `PropertiesService.getScriptProperties().setProperty("ACTIVE_FORM_ID", formId)` so HTTP endpoints and triggers locate the form dynamically.
 
 ---
 
-## 2. V2 Architecture & Delivery Profiles
+## 2. Deterministic Anti-Bias Question Routing ("If X, Then Y")
 
-V2 introduces three streamlined delivery profiles to match the user's workflow:
+AI agents suffer from severe confirmation bias when writing multiple-choice questions: they present one "happy path" option alongside two or three strawmen. V3 strictly prohibits subjective multiple-choice questions and enforces deterministic routing:
+
+| Decision Context (If X...) | Required `FormApp` Method (...Then Use Y) | Structural Enforcement Rules |
+|---|---|---|
+| **Balancing two competing trade-offs** *(e.g., latency vs. verification depth, simplicity vs. throughput)* | `form.addScaleItem()` | **Bipolar Linear Scale (1 to 5):** Both endpoints must be labeled with valid, contrasting engineering priorities. Generic labels (`"Low"/"High"`, `"Min"/"Max"`, `"Bad"/"Good"`) are forbidden. |
+| **Evaluating multi-dimensional system constraints** *(e.g., RAM, cost, cold-start, ops burden)* | `form.addGridItem()` | **Constraint Tolerance Matrix:** Rows must be the specific system dimensions. Columns must be uniform tolerance tiers: `["Strict / Zero Tolerance", "Flexible / Negotiable", "Irrelevant / Ignore"]`. |
+| **Selecting non-exclusive components, features, or architecture modules** | `form.addCheckboxItem()` | **Failure-Mode / Downside Checkboxes:** Every choice value must be phrased strictly as its primary maintenance burden, resource cost, or failure mode. Positive marketing words (`"Seamless"`, `"Fast"`, `"Recommended"`, `"Optimal"`) are banned. |
+| **Defining hard operational boundaries, numeric caps, or invariants** | `form.addTextItem()` | **Scalar / Invariant Input:** Ask for an exact numeric ceiling, timeout, path, or invariant string rather than pre-bucketed multiple-choice tiers. |
+| **Selecting mutually exclusive factual enums** *(e.g., target OS, runtime environment)* | `form.addMultipleChoiceItem()` | **Restricted Enum Only:** Prohibited for subjective choices or strategy selection. Permitted *only* for factual enums and MUST be preceded by the comment `// @allow-enum-mc` to pass static validation. |
+
+---
+
+## 3. V3 Delivery Profiles Matrix
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                   V2 DELIVERY PROFILES MATRIX                                     │
+│                                   V3 DELIVERY PROFILES MATRIX                                     │
 ├─────────────────┬───────────────────────────────┬─────────────────────────┬───────────────────────┤
-│ Profile         │ How LLM / User Gets Responses │ Setup Effort            │ GCP Needed?           │
+│ Profile         │ How Agent / User Gets JSON    │ Setup Effort            │ GCP Needed?           │
 ├─────────────────┼───────────────────────────────┼─────────────────────────┼───────────────────────┤
 │ Profile A (API) │ HTTP GET /exec endpoint (JSON)│ 1-Click Deploy Web App  │ NO (100% Free Apps    │
-│                 │ (curl / direct agent fetch)   │                         │     Script Web App)   │
+│                 │ (curl / direct agent fetch)   │ or `clasp deploy`       │     Script Web App)   │
 ├─────────────────┼───────────────────────────────┼─────────────────────────┼───────────────────────┤
-│ Profile B (Push)│ Instant HTTP POST to Webhook  │ Provide webhook URL     │ NO (Native            │
-│                 │ (Relay, Slack, Discord, API)  │                         │     UrlFetchApp)      │
+│ Profile B (Push)│ Instant HTTP POST to Webhook  │ Set TARGET_WEBHOOK_URL  │ NO (Native            │
+│                 │ (Relay, local daemon, Slack)  │ & run setup function    │     UrlFetchApp)      │
 ├─────────────────┼───────────────────────────────┼─────────────────────────┼───────────────────────┤
-│ Profile C (V1)  │ Apps Script Execution Log JSON│ Zero setup (paste & run)│ NO                    │
-│                 │ (Manual copy-paste into chat) │                         │                       │
+│ Profile C (Log) │ Apps Script Execution Log JSON│ Zero setup (paste & run)│ NO                    │
+│                 │ (`getFormResponses()`)        │                         │                       │
 └─────────────────┴───────────────────────────────┴─────────────────────────┴───────────────────────┘
 ```
 
 ---
 
-## 3. Profile A: Deployable Web App HTTP JSON API (Recommended)
-
-Profile A turns your Google Form and Apps Script project into a persistent REST-like JSON API. Once deployed, an LLM or local tool can fetch responses automatically via HTTP GET without opening Google Forms or checking logs.
-
-### Complete Profile A Template (`Code.gs`)
+## 4. Profile A: Deployable Web App HTTP JSON API (`Code.gs`)
 
 ```javascript
 /**
  * =========================================================================
- * PROFILE A: FORM CREATOR & HTTP GET WEB APP ENDPOINT
+ * PROFILE A: ANTI-BIAS FORM CREATOR & HTTP GET JSON ENDPOINT (V3.0)
  * =========================================================================
  * Setup:
  * 1. Paste into script.google.com and run 'createForm'.
  * 2. Click 'Deploy' > 'New deployment' > Select type: 'Web app'.
  * 3. Set 'Execute as: Me' and 'Who has access: Anyone'.
- * 4. Click 'Deploy'. Use the generated Web App URL to fetch JSON anytime!
+ * 4. Fetch structured JSON anytime via:
+ *    curl -sL "[https://script.google.com/macros/s/](https://script.google.com/macros/s/){DEPLOYMENT_ID}/exec?action=latest"
  */
 
 function createForm() {
-  const form = FormApp.create("TASK_TITLE_HERE");
+  const form = FormApp.create("System Architecture & Constraint Alignment");
 
-  // RULE 4: Explicit context
+  // INVARIANT 4: Explicit context
   form.setDescription(
-    "WHY THIS FORM EXISTS: [Explain why this form was created, the background situation, " +
-    "how responses will be used, and time commitment.]"
+    "WHY THIS FORM EXISTS: This form resolves architectural trade-offs and operational boundaries " +
+    "without conversational back-and-forth. Responses are serialized directly into structured JSON " +
+    "for automated agent ingestion. Estimated time: 2 minutes. All fields are optional."
   );
-  form.setConfirmationMessage("Responses recorded! You can safely close this window.");
+  form.setConfirmationMessage("Responses recorded. The agent can now query the JSON endpoint.");
   form.setAllowResponseEdits(true);
   form.setShowLinkToRespondAgain(false);
-  
-  // RULE 1: Default to NO email collection
+
+  // INVARIANT 1: Email collection disabled
   form.setCollectEmail(false);
 
-  // RULE 2: Question 1 is ALWAYS Name
-  // RULE 3: NEVER require any specific response
+  // INVARIANT 2 & 3: Question 1 is ALWAYS Name and optional
   form.addTextItem()
     .setTitle("Name")
-    .setHelpText("Please enter your name (optional)")
+    .setHelpText("Please enter your name or handle (optional)")
     .setRequired(false);
 
-  // --- CUSTOM QUESTIONS GO HERE ---
-  // (All questions must use .setRequired(false))
+  // ANTI-BIAS RULE 1: Bipolar Linear Scale for competing priorities
+  form.addScaleItem()
+    .setTitle("Execution Speed vs. Verification Rigor")
+    .setHelpText("Select the operating balance point between fast execution and deep state checks.")
+    .setBounds(1, 5)
+    .setLabels("Minimum latency (skip non-critical checks)", "Maximum verification (strict schema & state audits)")
+    .setRequired(false);
 
-  // RULE 5: Final question is ALWAYS an unconstrained freeform text area
+  // ANTI-BIAS RULE 2: Constraint Tolerance Grid
+  form.addGridItem()
+    .setTitle("System Constraint Tolerances")
+    .setHelpText("Assign your enforcement posture for each operational dimension.")
+    .setRows([
+      "Memory Footprint (RAM ceiling)",
+      "External Network Dependencies",
+      "Cold-Start Initialization Time",
+      "Third-Party API Token Spend"
+    ])
+    .setColumns([
+      "Strict / Zero Tolerance",
+      "Flexible / Negotiable",
+      "Irrelevant / Ignore"
+    ])
+    .setRequired(false);
+
+  // ANTI-BIAS RULE 3: Failure-Mode Checkboxes
+  form.addCheckboxItem()
+    .setTitle("Acceptable Architectural Failure Modes & Maintenance Costs")
+    .setHelpText("Select only the operational burdens you are willing to accept and maintain.")
+    .setChoiceValues([
+      "SQLite write-lock contention under high concurrency",
+      "Background worker daemon memory overhead (systemd linger)",
+      "Webhook delivery failure risk during network partitions",
+      "Manual migration scripts required on schema changes"
+    ])
+    .showOtherOption(true)
+    .setRequired(false);
+
+  // ANTI-BIAS RULE 4: Hard Boundary Scalar Input
+  form.addTextItem()
+    .setTitle("Hard Execution Timeout Ceiling (Seconds)")
+    .setHelpText("Specify an exact numeric timeout limit or invariant (e.g., 30s, 120s).")
+    .setRequired(false);
+
+  // ANTI-BIAS RULE 5: Factual Enum Multiple Choice (Requires annotation)
+  // @allow-enum-mc
+  form.addMultipleChoiceItem()
+    .setTitle("Target Runtime Environment")
+    .setHelpText("Mutually exclusive deployment target.")
+    .setChoiceValues(["Local Workstation", "Staging VPS", "Production VPS"])
+    .setRequired(false);
+
+  // INVARIANT 5: Final question is ALWAYS an unconstrained freeform text area
   form.addParagraphTextItem()
-    .setTitle("Final Thoughts & Open Notes")
-    .setHelpText("Feel free to write anything else you'd like to share in any way you please.")
+    .setTitle("Final Thoughts, Overrides & Open Notes")
+    .setHelpText("Write any additional constraints, overrides, or raw thoughts in any format you please.")
     .setRequired(false);
 
-  // Save Form ID for the Web App endpoint
+  // INVARIANT 7: Persist Form ID
   const formId = form.getId();
   PropertiesService.getScriptProperties().setProperty("ACTIVE_FORM_ID", formId);
 
-  Logger.log("\n=======================================================");
-  Logger.log("🎉 FORM CREATED SUCCESSFULLY!");
-  Logger.log("👉 LIVE FORM URL: " + form.getPublishedUrl());
-  Logger.log("🛠️ EDIT FORM URL: " + form.getEditUrl());
-  Logger.log("📋 FORM ID: " + formId);
-  Logger.log("=======================================================\n");
-  Logger.log("NEXT STEP: Click Deploy > New deployment > Web app to enable HTTP JSON retrieval.");
+  Logger.log("=======================================================");
+  Logger.log("FORM CREATED SUCCESSFULLY");
+  Logger.log("LIVE FORM URL: " + form.getPublishedUrl());
+  Logger.log("EDIT FORM URL: " + form.getEditUrl());
+  Logger.log("FORM ID: " + formId);
+  Logger.log("=======================================================");
 
   return formId;
 }
 
 /**
- * Handles HTTP GET requests to the deployed Web App URL.
- * URL: https://script.google.com/macros/s/{DEPLOYMENT_ID}/exec
- * Query Parameters:
- *   ?action=all       -> Returns all submissions (default)
- *   ?action=latest    -> Returns only the most recent submission
- *   ?action=summary   -> Returns submission count & status
+ * HTTP GET Web App Endpoint
+ * Query Params:
+ *   ?action=all     (default) Returns all submissions
+ *   ?action=latest  Returns only the most recent submission
+ *   ?action=summary Returns metadata and submission count
  */
 function doGet(e) {
   try {
     const formId = PropertiesService.getScriptProperties().getProperty("ACTIVE_FORM_ID");
     if (!formId) {
-      return respondJson({ status: "error", message: "No form found. Run createForm first." });
+      return respondJson({ status: "error", message: "No ACTIVE_FORM_ID found. Run createForm() first." });
     }
 
     const form = FormApp.openById(formId);
@@ -156,28 +212,22 @@ function doGet(e) {
     if (action === "summary") {
       return respondJson({
         status: "success",
+        formId: formId,
         formTitle: form.getTitle(),
+        publishedUrl: form.getPublishedUrl(),
         totalSubmissions: responses.length,
         isAcceptingResponses: form.isAcceptingResponses()
       });
     }
 
     const formatted = responses.map((resp, index) => {
-      const answers = {};
-      resp.getItemResponses().forEach(item => {
-        answers[item.getItem().getTitle()] = item.getResponse();
-      });
-      return {
-        submission: index + 1,
-        timestamp: resp.getTimestamp().toISOString(),
-        respondentEmail: resp.getRespondentEmail() || "Anonymous",
-        answers: answers
-      };
+      return serializeResponse(resp, index + 1);
     });
 
     if (action === "latest") {
       return respondJson({
         status: "success",
+        formId: formId,
         totalSubmissions: formatted.length,
         latestSubmission: formatted.length > 0 ? formatted[formatted.length - 1] : null
       });
@@ -185,13 +235,48 @@ function doGet(e) {
 
     return respondJson({
       status: "success",
+      formId: formId,
       totalSubmissions: formatted.length,
       submissions: formatted
     });
-
   } catch (error) {
     return respondJson({ status: "error", message: error.toString() });
   }
+}
+
+function serializeResponse(resp, submissionNumber) {
+  const answers = {};
+  const itemResponses = resp.getItemResponses();
+
+  itemResponses.forEach(itemResp => {
+    const item = itemResp.getItem();
+    const title = item.getTitle();
+    const type = item.getType();
+    const rawValue = itemResp.getResponse();
+
+    if (type === FormApp.ItemType.GRID || type === FormApp.ItemType.CHECKBOX_GRID) {
+      const rows = (type === FormApp.ItemType.GRID)
+        ? item.asGridItem().getRows()
+        : item.asCheckboxGridItem().getRows();
+      const gridMap = {};
+      rows.forEach((rowLabel, idx) => {
+        gridMap[rowLabel] = (rawValue && rawValue[idx] !== null && rawValue[idx] !== undefined)
+          ? rawValue[idx]
+          : null;
+      });
+      answers[title] = gridMap;
+    } else {
+      answers[title] = rawValue;
+    }
+  });
+
+  return {
+    submission: submissionNumber,
+    responseId: resp.getId(),
+    timestamp: resp.getTimestamp().toISOString(),
+    respondentEmail: resp.getRespondentEmail() || "Anonymous",
+    answers: answers
+  };
 }
 
 function respondJson(data) {
@@ -199,196 +284,110 @@ function respondJson(data) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// Fallback manual retrieval for V1 compatibility
+// Profile C Fallback: Dump JSON directly to Execution Log
 function getFormResponses() {
   const formId = PropertiesService.getScriptProperties().getProperty("ACTIVE_FORM_ID");
+  if (!formId) {
+    Logger.log("Error: No ACTIVE_FORM_ID set.");
+    return;
+  }
   const form = FormApp.openById(formId);
-  const data = form.getResponses().map((resp, i) => {
-    const answers = {};
-    resp.getItemResponses().forEach(item => { answers[item.getItem().getTitle()] = item.getResponse(); });
-    return { submission: i + 1, timestamp: resp.getTimestamp().toISOString(), answers };
-  });
-  Logger.log("\n" + JSON.stringify(data, null, 2) + "\n");
+  const formatted = form.getResponses().map((resp, idx) => serializeResponse(resp, idx + 1));
+  Logger.log("\n" + JSON.stringify(formatted, null, 2) + "\n");
 }
 ```
 
 ---
 
-## 4. Profile B: Outbound Webhook Push (`onFormSubmit`)
-
-Profile B automatically notifies an external webhook (e.g. a local server, Slack channel, Discord webhook, or automation endpoint) the instant a respondent hits Submit.
-
-### Complete Profile B Template (`Code.gs`)
+## 5. Profile B: Real-Time Outbound Webhook Push (`onFormSubmit`)
 
 ```javascript
 /**
  * =========================================================================
- * PROFILE B: OUTBOUND REAL-TIME WEBHOOK TRIGGER
+ * PROFILE B: OUTBOUND REAL-TIME WEBHOOK DISPATCHER (V3.0)
  * =========================================================================
- * Submits form responses directly to an HTTP POST destination.
- * Zero GCP setup — uses native UrlFetchApp and ScriptApp triggers.
+ * Automatically POSTs structured JSON (including mapped Grid objects) to
+ * TARGET_WEBHOOK_URL the instant a respondent submits the form.
  */
 
-const TARGET_WEBHOOK_URL = "https://your-webhook-endpoint.com/api/responses";
+const TARGET_WEBHOOK_URL = "[https://your-webhook-endpoint.example.com/api/form-intake](https://your-webhook-endpoint.example.com/api/form-intake)";
 
-function createWebhookForm() {
-  const form = FormApp.create("Intake Survey with Push Webhook");
+function setupWebhookForm() {
+  const formId = createForm(); // Uses createForm() from Profile A
+  const form = FormApp.openById(formId);
 
-  // RULE 4: Explicit context
-  form.setDescription("WHY THIS FORM EXISTS: Intake survey with real-time automated dispatch.");
-  form.setConfirmationMessage("Responses recorded and dispatched! Thank you.");
-  
-  // RULE 1: Default to NO email collection
-  form.setCollectEmail(false);
+  // Deduplicate existing submit triggers
+  ScriptApp.getProjectTriggers().forEach(trigger => {
+    if (trigger.getHandlerFunction() === "handleFormSubmit") {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
 
-  // RULE 2 & 3: Question 1 is Name (optional)
-  form.addTextItem().setTitle("Name").setRequired(false);
-
-  // Custom questions (all setRequired(false))
-  form.addParagraphTextItem().setTitle("Project Scope & Requirements").setRequired(false);
-
-  // RULE 5: Final question is freeform
-  form.addParagraphTextItem()
-    .setTitle("Final Thoughts & Open Notes")
-    .setHelpText("Write anything else you'd like to share in any way you please.")
-    .setRequired(false);
-
-  const formId = form.getId();
-  PropertiesService.getScriptProperties().setProperty("ACTIVE_FORM_ID", formId);
-
-  // Automatically attach installable trigger (No manual trigger setup needed!)
   ScriptApp.newTrigger("handleFormSubmit")
     .forForm(form)
     .onFormSubmit()
     .create();
 
-  Logger.log("🎉 Form and trigger created! Live URL: " + form.getPublishedUrl());
+  Logger.log("Webhook trigger installed -> " + TARGET_WEBHOOK_URL);
 }
 
-/**
- * Triggered automatically by Google whenever the form is submitted.
- */
 function handleFormSubmit(e) {
   try {
-    const formResponse = e.response;
-    const answers = {};
+    if (!e || !e.response) return;
 
-    formResponse.getItemResponses().forEach(itemResp => {
-      answers[itemResp.getItem().getTitle()] = itemResp.getResponse();
-    });
-
+    const serialized = serializeResponse(e.response, 1);
     const payload = {
-      event: "form_submission",
-      formTitle: e.source.getTitle(),
-      timestamp: formResponse.getTimestamp().toISOString(),
-      respondentEmail: formResponse.getRespondentEmail() || "Anonymous",
-      answers: answers
+      event: "google_form_submission",
+      formTitle: e.source ? e.source.getTitle() : "Intake Form",
+      formId: e.source ? e.source.getId() : null,
+      submission: serialized
     };
 
-    const options = {
+    const res = UrlFetchApp.fetch(TARGET_WEBHOOK_URL, {
       method: "post",
       contentType: "application/json",
       payload: JSON.stringify(payload),
       muteHttpExceptions: true
-    };
+    });
 
-    const res = UrlFetchApp.fetch(TARGET_WEBHOOK_URL, options);
-    Logger.log("Webhook response code: " + res.getResponseCode());
+    Logger.log("Webhook HTTP Status: " + res.getResponseCode());
   } catch (err) {
-    Logger.log("Error dispatching webhook: " + err.toString());
+    Logger.log("Webhook Dispatch Error: " + err.toString());
   }
 }
 ```
 
 ---
 
-## 5. Question Item Catalog (`FormApp` Methods)
+## 6. Zero-GCP Terminal Workflow (`@google/clasp`)
 
-Always enforce `.setRequired(false)` across all items:
-
-| Question Type | Apps Script Method | Example Code |
-|---|---|---|
-| **Short Text** | `addTextItem()` | `.setTitle("Project Nickname").setRequired(false)` |
-| **Long Text** | `addParagraphTextItem()` | `.setTitle("Description").setRequired(false)` |
-| **Multiple Choice** | `addMultipleChoiceItem()` | `.setTitle("Track").setChoiceValues(["A", "B"]).setRequired(false)` |
-| **Checkboxes** | `addCheckboxItem()` | `.setTitle("Skills").setChoiceValues(["JS", "Python"]).showOtherOption(true).setRequired(false)` |
-| **Dropdown** | `addListItem()` | `.setTitle("Region").setChoiceValues(["US", "EU"]).setRequired(false)` |
-| **Linear Scale** | `addScaleItem()` | `.setTitle("Rating").setBounds(1, 5).setLabels("Min", "Max").setRequired(false)` |
-| **Date & Time** | `addDateItem()` / `addTimeItem()` | `.setTitle("Kickoff Date").setIncludesYear(true).setRequired(false)` |
-| **Choice Grid** | `addGridItem()` | `.setTitle("Priority").setRows([...]).setColumns([...]).setRequired(false)` |
-| **Checkbox Grid**| `addCheckboxGridItem()` | `.setTitle("Matrix").setRows([...]).setColumns([...]).setRequired(false)` |
-| **Section Break**| `addPageBreakItem()` | `.setTitle("Section 2: Details")` |
-
----
-
-## 6. Dynamic Page Branching (Skip Logic)
-
-```javascript
-// Branching with all optional inputs:
-const pageA = form.addPageBreakItem().setTitle("Path A");
-const pageB = form.addPageBreakItem().setTitle("Path B");
-const finalPage = form.addPageBreakItem().setTitle("Final Overview");
-
-const router = form.addMultipleChoiceItem();
-router.setTitle("Choose your path")
-  .setChoices([
-    router.createChoice("Go to Path A", pageA),
-    router.createChoice("Go to Path B", pageB)
-  ])
-  .setRequired(false);
-
-pageA.setGoToPage(finalPage);
-pageB.setGoToPage(finalPage);
-```
-
----
-
-## 7. Zero-GCP Terminal Tooling: `@google/clasp`
-
-You can develop, push, and deploy scripts from your local terminal using Google's open-source CLI `@google/clasp` **without Google Cloud Platform registration**:
-
-### One-Time Setup:
-1. Open [script.google.com/home/usersettings](https://script.google.com/home/usersettings) in your browser.
-2. Toggle **Google Apps Script API** to **ON**. (This is a 1-click Drive setting, NOT GCP).
-3. In your terminal:
+1. Enable **Google Apps Script API** at `https://script.google.com/home/usersettings`.
+2. Authenticate and deploy from your local shell:
    ```bash
    npm install -g @google/clasp
    clasp login
+   clasp create --title "Agent Decision Intake" --type standalone
+   node scripts/validate_form_script.js Code.gs
+   clasp push
+   clasp deploy --description "V3 Anti-Bias JSON Endpoint"
+   ```
+3. Fetch responses directly into your agent harness:
+   ```bash
+   curl -sL "[https://script.google.com/macros/s/](https://script.google.com/macros/s/){DEPLOYMENT_ID}/exec?action=latest"
    ```
 
-### Daily Workflow:
-```bash
-# Create a new Apps Script project directly in your Google Drive:
-clasp create --title "My Automated Google Form" --type standalone
-
-# Push local Code.gs to Google:
-clasp push
-
-# Deploy as Web App directly from CLI:
-clasp deploy --description "Production V2 Web App"
-```
-
 ---
 
-## 8. Reference Implementations
+## 7. Pre-Flight Checklist for the AI Agent
 
-The following complete, tested reference files are provided in the skill:
-- [`references/hotel_guest_experience_survey.gs`](./references/hotel_guest_experience_survey.gs) - Complete survey showcase with branching, grids, and all question types.
-- [`references/v2_webapp_api_form.gs`](./references/v2_webapp_api_form.gs) - Complete Profile A implementation with `doGet(e)` JSON endpoints.
-- [`references/v2_webhook_push_form.gs`](./references/v2_webhook_push_form.gs) - Complete Profile B implementation with automated `onFormSubmit` outbound push.
-- [`references/v2_workspace_sheets_summary.gs`](./references/v2_workspace_sheets_summary.gs) - Linked Google Sheets sync and analytics.
-- [`scripts/validate_form_script.js`](./scripts/validate_form_script.js) - Automated Node.js rule validator that verifies code against the 5 non-negotiable rules.
-- [`templates/clasp_workflow.md`](./templates/clasp_workflow.md) - Zero-GCP terminal workflow using `@google/clasp`.
-
----
-
-## 9. Checklist for the LLM
-
-Before providing any script to the user:
-- [ ] Is `form.setCollectEmail(false)` explicitly invoked?
-- [ ] Is Question 1 **"Name"** (`addTextItem`) and marked optional (`.setRequired(false)`)?
-- [ ] Does `form.setDescription(...)` provide explicit context explaining **why the form exists** and how answers will be used?
-- [ ] Are ALL questions strictly optional (`.setRequired(false)`) so no specific response is ever required?
-- [ ] Is the final question an open freeform paragraph text area (`addParagraphTextItem`) allowing the user to write text any way she pleases?
-- [ ] Are all functions self-contained so the user copies once?
-- [ ] Is `PropertiesService.getScriptProperties().setProperty("ACTIVE_FORM_ID", formId)` included?
+Before outputting any Google Apps Script form code, verify every item:
+- [ ] **Rule 1 (No Email):** Is `form.setCollectEmail(false)` explicitly present?
+- [ ] **Rule 2 (First Question Name):** Is Question 1 `"Name"` (`addTextItem`) with `.setRequired(false)`?
+- [ ] **Rule 3 (Everything Optional):** Does every single question item call `.setRequired(false)` with zero instances of `.setRequired(true)`?
+- [ ] **Rule 4 (Explicit Context):** Does `form.setDescription(...)` explain why the form exists, what decision it unblocks, and the time commitment?
+- [ ] **Rule 5 (Open Final Question):** Is the final question `form.addParagraphTextItem()` with `.setRequired(false)`?
+- [ ] **Rule 6 (Anti-Bias Scales):** Are all competing priorities modeled with `addScaleItem()` using contrasting, descriptive bipolar endpoint labels?
+- [ ] **Rule 7 (Anti-Bias Grids):** Are multi-dimensional system constraints modeled with `addGridItem()` where rows are dimensions and columns are tolerance tiers?
+- [ ] **Rule 8 (Downside Checkboxes):** Are all `addCheckboxItem()` choices written strictly in terms of maintenance cost, overhead, or failure modes without positive marketing spin?
+- [ ] **Rule 9 (Multiple-Choice Ban):** Have all subjective `addMultipleChoiceItem()` calls been eliminated (or annotated with `// @allow-enum-mc` for strict factual enums)?
+- [ ] **Rule 10 (Grid Serialization):** Does the response serializer map `GRID` row arrays back to named row-key objects so the resulting JSON is self-documenting?
