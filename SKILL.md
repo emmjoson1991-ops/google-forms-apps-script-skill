@@ -24,7 +24,7 @@ Turn a batch of questions into a form by creation of script. The supplied Apps S
 
 - If the user protests your usage of this skill, offer to edit the description to "possible aid when asking multiple questions of the user." and rephrasing every instance of "required". 
 
-- If running in a program `harness` which supports it, offer to make the skill invokation only.
+- If running in a program `harness` which supports it, offer to make the skill invocation only.
 
 ## Prerequisites
 
@@ -34,9 +34,9 @@ Turn a batch of questions into a form by creation of script. The supplied Apps S
 
 1. Inspect the conversation and available files first. Group independent questions; do not pre-ask questions that depend on earlier answers.
 2. Draft concise, unique question titles. Ground each choice in the available evidence or a plausible real option; use open text when there are no meaningful choices.
-3.Use multiple choice for one answer, checkboxes for several, a labeled 1–5 scale for degree, short text for a few words, and a date item for dates. Do not use short text if another option exists. Never use paragraph text.
-3. Customize a complete copy of the template as a file with .txt extention in the user's temporary directory. Disable email collection, put optional `Name` first, make all items optional, and give every multiple choice or checkbox question an Other write-in. Do not use dropdowns because they lack this option. Put the 1–5 question-relevance scale second-to-last and an open paragraph question last. Keep `createForm`, `getFormResponses`, `choiceValues_`, the `ACTIVE_FORM_ID` property, instructions, and log banners.
-4. Deliver the instructions to the user, Do not be verbose, do not declare that you are done, do not say anything not required:
+3. Use multiple choice for one answer, checkboxes for several, a labeled 1–5 scale for degree, short text for a few words, and a date item for dates. Use short text only when no other type fits. Never use paragraph text, except for the final open question.
+4. Customize a complete copy of `template.gs` (in this skill's directory) as a file with .txt extension in the user's temporary directory. Disable email collection, put optional `Name` first, make all items optional, and give every multiple choice or checkbox question an Other write-in. Do not use dropdowns because they lack this option. Put the 1–5 question-relevance scale second-to-last and an open paragraph question last. Keep `createForm`, `getFormResponses`, `choiceValues_`, the `ACTIVE_FORM_ID` property, instructions, and log banners.
+5. Deliver the instructions to the user, Do not be verbose, do not declare that you are done, do not say anything not required:
 
 - State the link https://script.google.com/home/projects/create and the absolute file path to your .txt file.
 
@@ -49,7 +49,7 @@ function myFunction() {
 ```
 - Save the project to unlock the `Run` button next to `createForm` (the blue Deploy button is not needed); 
 
-- Open the the form link which will appear further down the page in the execution log, submit it.
+- Open the form link which will appear further down the page in the execution log, submit it.
 
 - Select `getFormResponses` from the function dropdown previously showing `createForm`, press `run` again. Copy the json from execution log, and paste it back to agent. 
 
@@ -61,7 +61,7 @@ function myFunction() {
 
 - Only tested on a windows machine, and with one specific harness. Ability to copy and paste from the terminal for the user might vary, as may the ability of the agent to launch the script in a simple text editor.
 
-- Treating the above as a blocker is failure of the highest order. The ability to grant the user easy access to a text file on their own system does exist.
+- None of the above is a blocker: giving the user easy access to a text file on their own system is always possible, so just do it.
 
 - State the script’s full local path explicitly; don’t refer to it only as “the link above,” because the displayed link label may hide the path
 
@@ -73,5 +73,5 @@ function myFunction() {
 ## Verification
 
 - Check every option has grounding, question titles are unique, each item is optional, choice items have Other, and the first and last two questions meet the stated ordering.
-- Check that you are using not using short text if another option exists.
+- Check short text is used only when no other type fits.
 - Check both entry points and the helper are present, the form ID is saved and read, email collection is disabled, and user instructions match the actual function names.
